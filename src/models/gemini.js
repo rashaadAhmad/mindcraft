@@ -1,6 +1,21 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from '@google/generative-ai';
 import { toSinglePrompt } from '../utils/text.js';
 import { getKey } from '../utils/keys.js';
+
+const safetySettings = [
+    {
+      category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+      threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+      threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+    {
+        category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+  ];
 
 export class Gemini {
     constructor(model_name, url) {
@@ -14,12 +29,12 @@ export class Gemini {
         let model;
         if (this.url) {
             model = this.genAI.getGenerativeModel(
-                {model: this.model_name || "gemini-pro"},
+                {model: this.model_name || "gemini-pro",safetySettings:safetySettings},
                 {baseUrl: this.url}
             );
         } else {
             model = this.genAI.getGenerativeModel(
-                {model: this.model_name || "gemini-pro"}
+                {model: this.model_name || "gemini-pro", safetySettings:safetySettings}
             );
         }
 
@@ -37,6 +52,7 @@ export class Gemini {
 
     async embed(text) {
         let model;
+        
         if (this.url) {
             model = this.genAI.getGenerativeModel(
                 {model: this.model_name || "embedding-001"},

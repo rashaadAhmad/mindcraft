@@ -21,7 +21,7 @@ function wrapExecution(func, resume=false, timeout=-1) {
 export const actionsList = [
     {
         name: '!newAction',
-        description: 'Perform new and unknown custom behaviors that are not available as a command by writing code.', 
+        description: 'Perform new and unknown custom behaviors that are not available as a command by writing code. Note that no arguments are required', 
         perform: async function (agent) {
             if (!settings.allow_insecure_coding)
                 return 'newAction Failed! Agent is not allowed to write code. Notify the user.';
