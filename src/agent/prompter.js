@@ -10,7 +10,8 @@ import { GPT } from '../models/gpt.js';
 import { Claude } from '../models/claude.js';
 import { ReplicateAPI } from '../models/replicate.js';
 import { Local } from '../models/local.js';
-
+import { GroqCloudAPI } from '../models/groq.js';
+import { HuggingFace } from '../models/huggingface.js';
 
 export class Prompter {
     constructor(agent, fp) {
@@ -18,35 +19,51 @@ export class Prompter {
         this.profile = JSON.parse(readFileSync(fp, 'utf8'));
         this.convo_examples = null;
         this.coding_examples = null;
-
+        
         let name = this.profile.name;
         let chat = this.profile.model;
+        this.cooldown = this.profile.cooldown ? this.profile.cooldown : 0;
+        this.last_prompt_time = 0;
+
+        // try to get "max_tokens" parameter, else null
+        let max_tokens = null;
+        if (this.profile.max_tokens)
+            max_tokens = this.profile.max_tokens;
         if (typeof chat === 'string' || chat instanceof String) {
             chat = {model: chat};
             if (chat.model.includes('gemini'))
                 chat.api = 'google';
-            else if (chat.model.includes('gpt'))
+            else if (chat.model.includes('gpt') || chat.model.includes('o1'))
                 chat.api = 'openai';
             else if (chat.model.includes('claude'))
                 chat.api = 'anthropic';
+            else if (chat.model.includes('huggingface/'))
+                chat.api = "huggingface";
             else if (chat.model.includes('meta/') || chat.model.includes('mistralai/') || chat.model.includes('replicate/'))
                 chat.api = 'replicate';
+            else if (chat.model.includes("groq/") || chat.model.includes("groqcloud/"))
+                chat.api = 'groq';
             else
                 chat.api = 'ollama';
         }
 
         console.log('Using chat settings:', chat);
 
-        if (chat.api == 'google')
+        if (chat.api === 'google')
             this.chat_model = new Gemini(chat.model, chat.url);
-        else if (chat.api == 'openai')
+        else if (chat.api === 'openai')
             this.chat_model = new GPT(chat.model, chat.url);
-        else if (chat.api == 'anthropic')
+        else if (chat.api === 'anthropic')
             this.chat_model = new Claude(chat.model, chat.url);
-        else if (chat.api == 'replicate')
+        else if (chat.api === 'replicate')
             this.chat_model = new ReplicateAPI(chat.model, chat.url);
-        else if (chat.api == 'ollama')
+        else if (chat.api === 'ollama')
             this.chat_model = new Local(chat.model, chat.url);
+        else if (chat.api === 'groq') {
+            this.chat_model = new GroqCloudAPI(chat.model.replace('groq/', '').replace('groqcloud/', ''), chat.url, max_tokens ? max_tokens : 8192);
+        }
+        else if (chat.api === 'huggingface')
+            this.chat_model = new HuggingFace(chat.model, chat.url);
         else
             throw new Error('Unknown API:', api);
 
@@ -62,13 +79,13 @@ export class Prompter {
 
         console.log('Using embedding settings:', embedding);
 
-        if (embedding.api == 'google')
+        if (embedding.api === 'google')
             this.embedding_model = new Gemini(embedding.model, embedding.url);
-        else if (embedding.api == 'openai')
+        else if (embedding.api === 'openai')
             this.embedding_model = new GPT(embedding.model, embedding.url);
-        else if (embedding.api == 'replicate') 
+        else if (embedding.api === 'replicate')
             this.embedding_model = new ReplicateAPI(embedding.model, embedding.url);
-        else if (embedding.api == 'ollama')
+        else if (embedding.api === 'ollama')
             this.embedding_model = new Local(embedding.model, embedding.url);
         else {
             this.embedding_model = null;
@@ -104,7 +121,7 @@ export class Prompter {
         ]);
     }
 
-    async replaceStrings(prompt, messages, examples=null, prev_memory=null, to_summarize=[], last_goals=null) {
+    async replaceStrings(prompt, messages, examples=null, to_summarize=[], last_goals=null) {
         prompt = prompt.replaceAll('$NAME', this.agent.name);
 
         if (prompt.includes('$STATS')) {
@@ -122,13 +139,13 @@ export class Prompter {
         if (prompt.includes('$EXAMPLES') && examples !== null)
             prompt = prompt.replaceAll('$EXAMPLES', await examples.createExampleMessage(messages));
         if (prompt.includes('$MEMORY'))
-            prompt = prompt.replaceAll('$MEMORY', prev_memory ? prev_memory : 'None.');
+            prompt = prompt.replaceAll('$MEMORY', this.agent.history.memory);
         if (prompt.includes('$TO_SUMMARIZE'))
             prompt = prompt.replaceAll('$TO_SUMMARIZE', stringifyTurns(to_summarize));
         if (prompt.includes('$CONVO'))
             prompt = prompt.replaceAll('$CONVO', 'Recent conversation:\n' + stringifyTurns(messages));
         if (prompt.includes('$SELF_PROMPT')) {
-            let self_prompt = this.agent.self_prompter.on ? `Use this self-prompt to guide your behavior: "${this.agent.self_prompter.prompt}"\n` : '';
+            let self_prompt = this.agent.self_prompter.on ? `YOUR CURRENT ASSIGNED GOAL: "${this.agent.self_prompter.prompt}"\n` : '';
             prompt = prompt.replaceAll('$SELF_PROMPT', self_prompt);
         }
         if (prompt.includes('$LAST_GOALS')) {
@@ -159,21 +176,32 @@ export class Prompter {
         return prompt;
     }
 
+    async checkCooldown() {
+        let elapsed = Date.now() - this.last_prompt_time;
+        if (elapsed < this.cooldown && this.cooldown > 0) {
+            await new Promise(r => setTimeout(r, this.cooldown - elapsed));
+        }
+        this.last_prompt_time = Date.now();
+    }
+
     async promptConvo(messages) {
+        await this.checkCooldown();
         let prompt = this.profile.conversing;
         prompt = await this.replaceStrings(prompt, messages, this.convo_examples);
         return await this.chat_model.sendRequest(messages, prompt);
     }
 
     async promptCoding(messages) {
+        await this.checkCooldown();
         let prompt = this.profile.coding;
         prompt = await this.replaceStrings(prompt, messages, this.coding_examples);
         return await this.chat_model.sendRequest(messages, prompt);
     }
 
-    async promptMemSaving(prev_mem, to_summarize) {
+    async promptMemSaving(to_summarize) {
+        await this.checkCooldown();
         let prompt = this.profile.saving_memory;
-        prompt = await this.replaceStrings(prompt, null, null, prev_mem, to_summarize);
+        prompt = await this.replaceStrings(prompt, null, null, to_summarize);
         return await this.chat_model.sendRequest([], prompt);
     }
 
@@ -183,7 +211,7 @@ export class Prompter {
 
         let user_message = 'Use the below info to determine what goal to target next\n\n';
         user_message += '$LAST_GOALS\n$STATS\n$INVENTORY\n$CONVO'
-        user_message = await this.replaceStrings(user_message, messages, null, null, null, last_goals);
+        user_message = await this.replaceStrings(user_message, messages, null, null, last_goals);
         let user_messages = [{role: 'user', content: user_message}];
 
         let res = await this.chat_model.sendRequest(user_messages, system_message);

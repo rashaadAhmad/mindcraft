@@ -13,6 +13,11 @@ const mc_version = settings.minecraft_version;
 const mcdata = minecraftData(mc_version);
 const Item = prismarine_items(mc_version);
 
+/**
+ * @typedef {string} ItemName
+ * @typedef {string} BlockName
+*/
+
 export const WOOD_TYPES = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak'];
 export const MATCHING_WOOD_BLOCKS = [
     'log',
@@ -188,6 +193,33 @@ export function getItemCraftingRecipes(itemName) {
     return recipes;
 }
 
+export function isSmeltable(itemName) {
+    const misc_smeltables = ['beef', 'chicken', 'cod', 'mutton', 'porkchop', 'rabbit', 'salmon', 'tropical_fish', 'potato', 'kelp', 'sand', 'cobblestone', 'clay_ball'];
+    return itemName.includes('raw') || itemName.includes('log') || misc_smeltables.includes(itemName);
+}
+
+export function getSmeltingFuel(bot) {
+    let fuel = bot.inventory.items().find(i => i.name === 'coal' || i.name === 'charcoal')
+    if (fuel)
+        return fuel;
+    fuel = bot.inventory.items().find(i => i.name.includes('log') || i.name.includes('planks'))
+    if (fuel)
+        return fuel;
+    return bot.inventory.items().find(i => i.name === 'coal_block' || i.name === 'lava_bucket');
+}
+
+export function getFuelSmeltOutput(fuelName) {
+    if (fuelName === 'coal' || fuelName === 'charcoal')
+        return 8;
+    if (fuelName.includes('log') || fuelName.includes('planks'))
+        return 1.5
+    if (fuelName === 'coal_block')
+        return 80;
+    if (fuelName === 'lava_bucket')
+        return 100;
+    return 0;
+}
+
 export function getItemSmeltingIngredient(itemName) {
     return {    
         baked_potato: 'potato',
@@ -241,4 +273,53 @@ export function getBlockTool(blockName) {
 
 export function makeItem(name, amount=1) {
     return new Item(getItemId(name), amount);
+}
+
+/**
+ * Returns the number of ingredients required to use the recipe once.
+ * 
+ * @param {Recipe} recipe
+ * @returns {Object<mc.ItemName, number>} an object describing the number of each ingredient.
+ */
+export function ingredientsFromPrismarineRecipe(recipe) {
+    let requiredIngedients = {};
+    if (recipe.inShape)
+        for (const ingredient of recipe.inShape.flat()) {
+            if(ingredient.id<0) continue; //prismarine-recipe uses id -1 as an empty crafting slot
+            const ingredientName = getItemName(ingredient.id);
+            requiredIngedients[ingredientName] ??=0;
+            requiredIngedients[ingredientName] += ingredient.count;
+        }
+    if (recipe.ingredients)
+        for (const ingredient of recipe.ingredients) {
+            if(ingredient.id<0) continue;
+            const ingredientName = getItemName(ingredient.id);
+            requiredIngedients[ingredientName] ??=0;
+            requiredIngedients[ingredientName] -= ingredient.count;
+            //Yes, the `-=` is intended.
+            //prismarine-recipe uses positive numbers for the shaped ingredients but negative for unshaped.
+            //Why this is the case is beyond my understanding.
+        }
+    return requiredIngedients;
+}
+
+/**
+ * Calculates the number of times an action, such as a crafing recipe, can be completed before running out of resources.
+ * @template T - doesn't have to be an item. This could be any resource.
+ * @param {Object.<T, number>} availableItems - The resources available; e.g, `{'cobble_stone': 7, 'stick': 10}`
+ * @param {Object.<T, number>} requiredItems - The resources required to complete the action once; e.g, `{'cobble_stone': 3, 'stick': 2}`
+ * @param {boolean} discrete - Is the action discrete?
+ * @returns {{num: number, limitingResource: (T | null)}} the number of times the action can be completed and the limmiting resource; e.g `{num: 2, limitingResource: 'cobble_stone'}`
+ */
+export function calculateLimitingResource(availableItems, requiredItems, discrete=true) {
+    let limitingResource = null;
+    let num = Infinity;
+    for (const itemType in requiredItems) {
+        if (availableItems[itemType] < requiredItems[itemType] * num) {
+            limitingResource = itemType;
+            num = availableItems[itemType] / requiredItems[itemType];
+        }
+    }
+    if(discrete) num = Math.floor(num);
+    return {num, limitingResource}
 }
