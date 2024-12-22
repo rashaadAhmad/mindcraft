@@ -1,6 +1,7 @@
 import * as skills from '../library/skills.js';
 import settings from '../../../settings.js';
 import convoManager from '../conversation.js';
+import { BlueprintLibrary } from '../library/blueprints.js';
 
 function runAsAction (actionFn, resume = false, timeout = -1) {
     let actionLabel = null;  // Will be set on first use
@@ -406,6 +407,53 @@ export const actionsList = [
             convoManager.endConversation(player_name);
             return `Converstaion with ${player_name} ended.`;
         }
+    },
+    {
+        name: '!listBuildings',
+        description: 'List all available blueprint buildings that can be built.',
+        perform: async function (agent) {
+            // Load blueprints if not already loaded
+            if (BlueprintLibrary.blueprints.size === 0) {
+                await BlueprintLibrary.loadFromDirectory();
+            }
+
+            // Check if we have any blueprints after loading
+            if (BlueprintLibrary.blueprints.size === 0) {
+                return "No blueprints found. Make sure there are .nbt or .json files in the schematics or blueprints directories.";
+            }
+
+            const categories = BlueprintLibrary.listBlueprints();
+            const response = [];
+            
+            for (const [category, blueprints] of Object.entries(categories)) {
+                response.push(`${category}: ${blueprints.join(', ')}`);
+            }
+            
+            return response.join('\n') || "No blueprints found";
+        }
+    },
+    {
+        name: '!build',
+        description: 'Build a structure from an available blueprint. Use !listBuildings first',
+        params: {
+            'blueprint_name': { type: 'string', description: 'The exact name of the blueprint to build.' }
+        },
+        perform: runAsAction(async (agent, blueprint_name) => {
+            // Load blueprints if not already loaded
+            if (BlueprintLibrary.blueprints.size === 0) {
+                await BlueprintLibrary.loadFromDirectory();
+            }
+
+            const blueprint = BlueprintLibrary.blueprints.get(blueprint_name);
+            if (!blueprint) {
+                skills.log(agent.bot, `Blueprint "${blueprint_name}" not found. Use !listBuildings to see available blueprints.`);
+                return;
+            }
+
+            skills.log(agent.bot, `Building ${blueprint_name}...`);
+            await blueprint.build(agent.bot, agent.bot.entity.position);
+            skills.log(agent.bot, 'Building complete!');
+        })
     }
     // { // commented for now, causes confusion with goal command
     //     name: '!npcGoal',

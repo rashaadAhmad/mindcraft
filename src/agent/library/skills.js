@@ -551,7 +551,7 @@ export async function placeBlock(bot, blockType, x, y, z, placeOn='bottom', dont
      * await skills.placeBlock(bot, "oak_log", p.x + 2, p.y, p.x);
      * await skills.placeBlock(bot, "torch", p.x + 1, p.y, p.x, 'side');
      **/
-    if (!mc.getBlockId(blockType)) {
+    if (!mc.getBlockId(blockType.split('[')[0])) {
         log(bot, `Invalid block type: ${blockType}.`);
         return false;
     }

@@ -1,19 +1,43 @@
-import { Blueprint, BlueprintLibrary } from '../library/blueprints.js';
+import { BlueprintLibrary } from '../library/blueprints.js';
 
-export const buildCommands = {
-    buildFromBlueprint: {
-        name: "!buildFromBlueprint",
-        description: "Build a structure from a blueprint",
-        syntax: "!buildFromBlueprint(name, style?, size?)",
-        examples: ["!buildFromBlueprint('house', 'wooden', 'small')"],
-        perform: async (agent, name, style = 'default', size = 'small') => {
-            const blueprint = BlueprintLibrary.get(name, style, size);
-            if (!blueprint) {
-                return `Blueprint ${name}_${style}_${size} not found`;
-            }
-            
-            await blueprint.build(agent.bot);
-            return `Built ${name} from blueprint!`;
-        }
+export async function build(bot, args) {
+    // Load blueprints if not already loaded
+    if (BlueprintLibrary.blueprints.size === 0) {
+        await BlueprintLibrary.loadFromDirectory();
+    }
+
+    let blueprint;
+    
+    if (!args || args.length === 0) {
+        // List available blueprint categories
+        const categories = BlueprintLibrary.listBlueprints();
+        const categoryList = Object.keys(categories).join(', ');
+        bot.chat(`Available building types: ${categoryList}`);
+        return;
+    }
+
+    const [type, style, size] = args;
+
+    if (style && size) {
+        // Try to get specific blueprint
+        blueprint = BlueprintLibrary.get(type, style, size);
+    } else {
+        // Get random blueprint of requested type
+        blueprint = BlueprintLibrary.getRandomBlueprint(type);
+    }
+
+    if (!blueprint) {
+        bot.chat(`I couldn't find a blueprint for ${args.join(' ')}`);
+        return;
+    }
+
+    bot.chat(`I'll build a ${blueprint.name} for you!`);
+    
+    try {
+        await blueprint.build(bot, bot.entity.position);
+        bot.chat('Building complete!');
+    } catch (err) {
+        bot.chat('Sorry, I had trouble building that.');
+        console.error('Build error:', err);
     }
 } 

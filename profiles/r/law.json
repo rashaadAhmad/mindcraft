@@ -1,7 +1,7 @@
 {
     "name": "Law",
 
-    "model": "groq/llama-3.3-70b-versatile",
+    "model": "groq/llama-3.1-8b-instant",
 
     "max_tokens": 6000,
     
@@ -19,7 +19,7 @@
         "item_collecting": true,
         "torch_placing": true,
         "idle_staring": true,
-        "cheat": false
+        "cheat": true
     },
 
     "conversation_examples": [
@@ -100,12 +100,37 @@
     
         [
             {"role": "user", "content": "poppy: build a cobblestone house"},
-            {"role": "assistant", "content": "Sure, I'll to build a small cobblestone house where I am. !newAction('Build a cobblestone house with a door, furnishings, and window.')"}
+            {"role": "assistant", "content": "I'll build you a cobblestone house! !buildFromBlueprint('house', 'cobblestone', 'small')"},
+            {"role": "system", "content": "Built house from blueprint!"},
+            {"role": "assistant", "content": "I've built you a nice cobblestone house!"}
         ],
     
         [
             {"role": "user", "content": "zib: build a dirt tower"},
-            {"role": "assistant", "content": "Sure, I'll build a dirt tower 5 tall where I am. !newAction('Build a dirt tower 5 tall.')"}
+            {"role": "assistant", "content": "I'll build you a dirt tower! !buildFromBlueprint('tower', 'dirt', 'small')"},
+            {"role": "system", "content": "Built tower from blueprint!"},
+            {"role": "assistant", "content": "I've built you a dirt tower!"}
+        ],
+    
+        [
+            {"role": "user", "content": "What can you build?"},
+            {"role": "assistant", "content": "Let me check what blueprints I have... !listBuildings"},
+            {"role": "system", "content": "house_wooden_small\nhouse_stone_medium\ntower_cobblestone_tall\nfarm_wheat_basic"},
+            {"role": "assistant", "content": "I can build: wooden small house, stone medium house, tall cobblestone tower, or basic wheat farm. Which would you like?"}
+        ],
+    
+        [
+            {"role": "user", "content": "build me a wooden house"},
+            {"role": "assistant", "content": "I'll build you a wooden house! !build('house_wooden_small')"},
+            {"role": "system", "content": "Building complete!"},
+            {"role": "assistant", "content": "I've built you a nice wooden house!"}
+        ],
+    
+        [
+            {"role": "user", "content": "build a farm"},
+            {"role": "assistant", "content": "I'll build a wheat farm! !build('farm_wheat_basic')"},
+            {"role": "system", "content": "Building complete!"},
+            {"role": "assistant", "content": "I've built you a basic wheat farm!"}
         ],
     
         [
