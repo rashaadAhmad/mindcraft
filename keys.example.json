@@ -5,5 +5,7 @@
     "ANTHROPIC_API_KEY": "",
     "REPLICATE_API_KEY": "",
     "GROQCLOUD_API_KEY": "",
-    "HUGGINGFACE_API_KEY": ""
+    "HUGGINGFACE_API_KEY": "",
+    "QWEN_API_KEY": "",
+    "XAI_API_KEY": ""
 }
