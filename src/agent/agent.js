@@ -10,6 +10,7 @@ import { SelfPrompter } from './self_prompter.js';
 import { handleTranslation, handleEnglishTranslation } from '../utils/translator.js';
 import { addViewer } from './viewer.js';
 import settings from '../../settings.js';
+import { BlueprintLibrary } from './library/blueprints.js';
 
 export class Agent {
     async start(profile_fp, load_mem=false, init_message=null, count_id=0) {
@@ -89,6 +90,8 @@ export class Agent {
 
             this.startEvents();
         });
+
+        await BlueprintLibrary.loadFromDirectory('./schematics');
     }
 
 

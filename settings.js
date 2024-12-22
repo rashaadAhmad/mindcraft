@@ -6,7 +6,9 @@ export default
     "auth": "offline", // or "microsoft"
     
     "profiles": [
-        "./profiles/gemini.json",
+        "./profiles/r/law.json",
+        // "./profiles/r/gamma.json",
+        // "./profiles/r/gemini.json"
         // add more profiles here, check ./profiles/ for more
         // more than 1 profile will require you to /msg each bot indivually
     ],
@@ -17,7 +19,7 @@ export default
     "show_bot_views": false, // show bot's view in browser at localhost:3000, 3001...
 
     "allow_insecure_coding": true, // allows newAction command and model can write/run code on your computer. enable at own risk
-    "code_timeout_mins": 10, // minutes code is allowed to run. -1 for no timeout
+    "code_timeout_mins": -1, // minutes code is allowed to run. -1 for no timeout
 
     "max_messages": 15, // max number of messages to keep in context
     "max_commands": -1, // max number of commands to use in a response. -1 for no limit

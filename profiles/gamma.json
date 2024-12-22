@@ -1,7 +1,7 @@
 {
-    "name": "Freeguy",
+    "name": "Gamma",
 
-    "model": "groq/llama-3.2-90b-text-preview",
+    "model": "groq/gemma2-9b-it",
 
     "max_tokens": 8000,
     

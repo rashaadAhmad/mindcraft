@@ -1,6 +1,7 @@
 import { getBlockId, getItemId } from "../../utils/mcdata.js";
 import { actionsList } from './actions.js';
 import { queryList } from './queries.js';
+import { BlueprintLibrary } from '../library/blueprints.js';
 
 let suppressNoDomainWarning = false;
 
@@ -249,3 +250,79 @@ export function getCommandDocs() {
     }
     return docs + '*\n';
 }
+
+export const commands = {
+    // ... existing commands ...
+
+    buildFromBlueprint: {
+        name: "!buildFromBlueprint",
+        description: "Build a structure from a blueprint schematic",
+        syntax: "!buildFromBlueprint(name, style?, size?)",
+        examples: ["!buildFromBlueprint('house', 'wooden', 'small')"],
+        perform: async (agent, name, style = 'default', size = 'small') => {
+            name = name.replace(/['"]/g, '');
+            style = style.replace(/['"]/g, '');
+            size = size.replace(/['"]/g, '');
+
+            const blueprint = BlueprintLibrary.get(name, style, size);
+            if (!blueprint) {
+                return `Blueprint ${name}_${style}_${size} not found`;
+            }
+            
+            const materials = blueprint.calculateMaterials();
+            const inventory = world.getInventoryCounts(agent.bot);
+            
+            const missing = {};
+            for (const [block, count] of Object.entries(materials)) {
+                if (!inventory[block] || inventory[block] < count) {
+                    missing[block] = count - (inventory[block] || 0);
+                }
+            }
+
+            if (Object.keys(missing).length > 0) {
+                return `Missing materials: ${Object.entries(missing).map(([block, count]) => `${count} ${block}`).join(', ')}`;
+            }
+
+            const pos = world.getNearestFreeSpace(agent.bot, blueprint.metadata.size.x, 16);
+            if (!pos) {
+                return "Couldn't find suitable space to build";
+            }
+
+            await blueprint.build(agent.bot, pos);
+            return `Built ${name} from blueprint!`;
+        }
+    },
+
+    listBlueprints: {
+        name: "!listBlueprints",
+        description: "List all available blueprint schematics",
+        syntax: "!listBlueprints()",
+        examples: ["!listBlueprints()"],
+        perform: async (agent) => {
+            const blueprints = Array.from(BlueprintLibrary.blueprints.keys());
+            if (blueprints.length === 0) {
+                return "No blueprints available";
+            }
+            return "Available blueprints:\n" + blueprints.join('\n');
+        }
+    },
+
+    showBlueprintInfo: {
+        name: "!showBlueprintInfo",
+        description: "Show details about a specific blueprint",
+        syntax: "!showBlueprintInfo(name)",
+        examples: ["!showBlueprintInfo('house_wooden_small')"],
+        perform: async (agent, name) => {
+            name = name.replace(/['"]/g, '');
+            const blueprint = BlueprintLibrary.get(name);
+            if (!blueprint) {
+                return `Blueprint ${name} not found`;
+            }
+            
+            const materials = blueprint.calculateMaterials();
+            return `Blueprint: ${blueprint.name}\n` +
+                   `Size: ${blueprint.metadata.size.x}x${blueprint.metadata.size.y}x${blueprint.metadata.size.z}\n` +
+                   `Materials needed:\n${Object.entries(materials).map(([block, count]) => `- ${count} ${block}`).join('\n')}`;
+        }
+    }
+};
